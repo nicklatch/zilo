@@ -71,6 +71,10 @@ pub fn main() !void {
     }
 
     try disableRawMode(originalTermios, 0);
+// TODO: Write more tests !
+
+test "expect ctrlKey to mask char into control key" {
+    try std.testing.expect(ctrlKey('q') == 17);
 }
 
 // NOTE:
