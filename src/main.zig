@@ -1,5 +1,7 @@
 const std = @import("std");
 const posix = std.posix;
+const TermiosSetError = std.posix.TermiosSetError;
+const TermiosGetError = std.posix.TermiosGetError;
 
 const TCSA = posix.TCSA;
 
@@ -8,14 +10,14 @@ const TCSA = posix.TCSA;
 ///
 /// Ideally it should be the original state before the editor was started
 /// and will return it back to canonical mode.
-fn disableRawMode(originalTermios: posix.termios, status: u8) posix.TermiosSetError!void {
+fn disableRawMode(originalTermios: posix.termios, status: u8) TermiosSetError!void {
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, originalTermios);
     std.process.exit(status);
 }
 
 /// Correctly sets various flags in the Termios struct
 /// to switch from canonical mode to raw (cooked) mode.
-fn enableRawMode(originalTermios: posix.termios) !void {
+fn enableRawMode(originalTermios: posix.termios) TermiosSetError!void {
     var raw = originalTermios;
     raw.lflag.ECHO = false;
     raw.lflag.ICANON = false;
