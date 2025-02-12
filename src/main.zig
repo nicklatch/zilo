@@ -7,8 +7,8 @@ const TCSA = posix.TCSA;
 const VMIN = 6;
 const VTIME = 5;
 
-/// Sets termios to the state passed in as the `orginalTermios` arg and
-/// exits the process successfully.
+/// Sets termios to the state passed in by `orginalTermios` and
+/// exits the process with the given `stats` code.
 ///
 /// Ideally it should be the original state before the editor was started
 /// and will return it back to canonical mode.
