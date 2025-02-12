@@ -7,8 +7,9 @@ const TCSA = posix.TCSA;
 const VMIN = 6;
 const VTIME = 5;
 
-/// Sets termios to the state passed in by `orginalTermios` and
-/// exits the process with the given `stats` code.
+inline fn ctrlKey(key: u8) u8 {
+    return key & 0x1f;
+}
 ///
 /// Ideally it should be the original state before the editor was started
 /// and will return it back to canonical mode.
