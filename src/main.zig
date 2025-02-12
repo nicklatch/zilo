@@ -49,16 +49,23 @@ fn enableRawMode(originalTermios: posix.termios) TermiosSetError!void {
 }
 
 pub fn main() !void {
-    // Make a copy of the original termios state so we
-    // can restor terminal state after leaving the editor
+    // TODO: Handle error for invalid input
     const originalTermios: posix.termios = try posix.tcgetattr(posix.STDIN_FILENO);
     const stdin = std.io.getStdIn().reader();
 
     try enableRawMode(originalTermios);
 
-    var buf: [100]u8 = undefined;
-    if (try stdin.readUntilDelimiterOrEof(&buf, 'q')) |input| {
-        _ = input;
+    while (true) {
+        const input = stdin.readByte() catch 0;
+
+        if (input == 'q') {
+            break;
+        } else if (std.ascii.isControl(input)) {
+            std.debug.print("{d}\r\n", .{input});
+        } else {
+            std.debug.print("{d}", .{input});
+            std.debug.print(":('{c}')\r\n", .{input});
+        }
     }
 
     try disableRawMode(originalTermios, 0);
