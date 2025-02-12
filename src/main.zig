@@ -63,3 +63,9 @@ pub fn main() !void {
 
     try disableRawMode(originalTermios, 0);
 }
+
+// NOTE:
+// ~~~~~~
+//  - Because we have disable output processing, all newlines
+//    must be an explicit `\r\n`, just using `\n` will cause
+//    walking.
