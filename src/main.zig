@@ -19,9 +19,30 @@ fn disableRawMode(originalTermios: posix.termios, status: u8) TermiosSetError!vo
 /// to switch from canonical mode to raw (cooked) mode.
 fn enableRawMode(originalTermios: posix.termios) TermiosSetError!void {
     var raw = originalTermios;
-    raw.lflag.ECHO = false;
-    raw.lflag.ICANON = false;
 
+    // Input Flags
+    raw.iflag.BRKINT = false;
+    raw.iflag.ICRNL = false; // Disables Ctrl-M
+    raw.iflag.INPCK = false;
+    raw.iflag.ISTRIP = false;
+    raw.iflag.IXON = false; // Disable Ctrl-S and Ctrl-Q
+
+    // Output Flags
+    raw.oflag.OPOST = false; // Disable output-processing
+
+    // Control Flags
+    raw.cflag.CSIZE = posix.CSIZE.CS8;
+
+    // Local Flags
+    raw.lflag.ECHO = false;
+    raw.lflag.ICANON = false; // Disable canonical mode (read by-byte instead of by-line)
+    raw.lflag.IEXTEN = false; // Disable Ctrl-V
+    raw.lflag.ISIG = false; // Disable Ctrl-C and Ctrl-Z
+
+    raw.cc[VMIN] = 0;
+    raw.cc[VTIME] = 1;
+
+    // Persist changes
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, raw);
 }
 
