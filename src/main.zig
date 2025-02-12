@@ -60,17 +60,22 @@ pub fn main() !void {
     while (true) {
         const input = stdin.readByte() catch 0;
 
-        if (input == 'q') {
-            break;
-        } else if (std.ascii.isControl(input)) {
+        if (std.ascii.isControl(input)) {
             std.debug.print("{d}\r\n", .{input});
         } else {
             std.debug.print("{d}", .{input});
             std.debug.print(":('{c}')\r\n", .{input});
         }
+
+        if (input == ctrlKey('q')) {
+            break;
+        }
     }
 
-    try disableRawMode(originalTermios, 0);
+    try disableRawMode(originalTermios);
+    std.process.cleanExit();
+}
+
 // TODO: Write more tests !
 
 test "expect ctrlKey to mask char into control key" {
