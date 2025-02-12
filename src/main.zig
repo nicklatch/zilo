@@ -4,6 +4,8 @@ const TermiosSetError = std.posix.TermiosSetError;
 const TermiosGetError = std.posix.TermiosGetError;
 
 const TCSA = posix.TCSA;
+const VMIN = 6;
+const VTIME = 5;
 
 /// Sets termios to the state passed in as the `orginalTermios` arg and
 /// exits the process successfully.
