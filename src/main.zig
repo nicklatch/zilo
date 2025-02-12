@@ -10,12 +10,13 @@ const VTIME = 5;
 inline fn ctrlKey(key: u8) u8 {
     return key & 0x1f;
 }
+
+/// Sets termios to the state passed in by `orginalTermios`.
 ///
 /// Ideally it should be the original state before the editor was started
 /// and will return it back to canonical mode.
-fn disableRawMode(originalTermios: posix.termios, status: u8) TermiosSetError!void {
+fn disableRawMode(originalTermios: posix.termios) TermiosSetError!void {
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, originalTermios);
-    std.process.exit(status);
 }
 
 /// Correctly sets various flags in the Termios struct
