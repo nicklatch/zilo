@@ -86,20 +86,46 @@ fn charSliceToNumber(charSlice: []const u8) usize {
     }
     return result;
 }
+const CursorPositionError = error{ EscapeSeqErr, LocationParseError };
 
-    while (true) {
-        const input = stdin.readByte() catch 0;
+/// **__WIP__**
+/// Right now, it just queries the terminal for its size,
+/// parses the out put, and writes it the the row and column
+/// pointers of the `editorState` struct
+fn getCursorPosition(rows: *usize, cols: *usize) !void {
+    // TODO: this should be moved to getWindowSize
+    var buf: [32]u8 = undefined;
+    var i: usize = 0;
+    var semiColonPos: usize = 0;
 
-        if (std.ascii.isControl(input)) {
-            std.debug.print("{d}\r\n", .{input});
-        } else {
-            std.debug.print("{d}", .{input});
-            std.debug.print(":('{c}')\r\n", .{input});
-        }
+    _ = try stdout.write("\x1b[6n");
 
+    while (i < @sizeOf(@TypeOf(buf)) - 1) {
+        const input = stdin.reader().readByte() catch 0;
+        buf[i] = input;
+        if (input == ';') semiColonPos = i;
+        i += 1;
+        if (input == 'R') break;
+    }
 
-        if (input == ctrlKey('q')) {
-            break;
+    if (buf[0] != '\x1b') return CursorPositionError.EscapeSeqErr;
+    if (buf[1] != '[') return CursorPositionError.EscapeSeqErr;
+
+    const position: []u8 = buf[0..i];
+    rows.* = charSliceToNumber(buf[2..semiColonPos]);
+    cols.* = charSliceToNumber(buf[semiColonPos + 1 .. position.len - 1]);
+
+    try stdout.writer().print("\r\nrows: {any}\r\ncols: {any}\r\n", .{ rows, cols });
+
+    _ = editorReadKey();
+}
+
+fn getWindowSize(rows: *usize, cols: *usize) !void {
+    _ = try stdout.write("\x1b[999C\x1b[999B");
+
+    try getCursorPosition(rows, cols);
+}
+
 fn editorProcessKeypress(editorState: *EditorState) !void {
     const char = editorReadKey();
     if (char == ctrlKey('q')) {
