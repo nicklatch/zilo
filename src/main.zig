@@ -62,6 +62,30 @@ fn editorReadKey() u8 {
     return stdin.reader().readByte() catch 0;
 }
 
+/// Converts a `[]const u8` containing decimal representations of ascii chars
+/// to their literal char value.
+///
+/// Example:
+/// ```zig
+/// test charSliceToNumber {
+///     const rows = [_]u8{ 53, 57 }; // {'5', '9'}
+///     const expected = 59;
+///     const actual = charSliceToNumber(rows[0..]);
+///     try std.testing.expectEqual(expected, actual);
+/// }
+/// ```
+fn charSliceToNumber(charSlice: []const u8) usize {
+    if (charSlice.len == 1) return charSlice[0] - '0';
+
+    var result: usize = 0;
+    var multiplier = std.math.pow(usize, 10, charSlice.len - 1);
+    for (charSlice) |char| {
+        const toNum = char - '0';
+        result += (toNum * multiplier);
+        multiplier /= 10;
+    }
+    return result;
+}
 
     while (true) {
         const input = stdin.readByte() catch 0;
@@ -72,6 +96,7 @@ fn editorReadKey() u8 {
             std.debug.print("{d}", .{input});
             std.debug.print(":('{c}')\r\n", .{input});
         }
+
 
         if (input == ctrlKey('q')) {
             break;
