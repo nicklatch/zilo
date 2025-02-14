@@ -22,17 +22,15 @@ inline fn ctrlKey(key: u8) u8 {
 }
 
 /// Sets termios to the state passed in by `orginalTermios`.
-///
-/// Ideally it should be the original state before the editor was started
-/// and will return it back to canonical mode.
-fn disableRawMode(originalTermios: posix.termios) TermiosSetError!void {
-    try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, originalTermios);
+fn disableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
+    try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, termiosPtr.*);
 }
 
-/// Correctly sets various flags in the Termios struct
-/// to switch from canonical mode to raw (cooked) mode.
-fn enableRawMode(originalTermios: posix.termios) TermiosSetError!void {
-    var raw = originalTermios;
+/// Sets various flags in the Termios struct to
+/// switch from canonical mode to raw (cooked) mode.
+fn enableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
+    termiosPtr.* = try posix.tcgetattr(posix.STDIN_FILENO);
+    var raw = termiosPtr.*;
 
     // Input Flags
     raw.iflag.BRKINT = false;
@@ -60,12 +58,7 @@ fn enableRawMode(originalTermios: posix.termios) TermiosSetError!void {
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, raw);
 }
 
-pub fn main() !void {
-    // TODO: Handle error for invalid input
-    const originalTermios: posix.termios = try posix.tcgetattr(posix.STDIN_FILENO);
-    const stdin = std.io.getStdIn().reader();
 
-    try enableRawMode(originalTermios);
 
     while (true) {
         const input = stdin.readByte() catch 0;
@@ -79,15 +72,45 @@ pub fn main() !void {
 
         if (input == ctrlKey('q')) {
             break;
+fn editorProcessKeypress(editorState: *EditorState) !void {
+    const char = editorReadKey();
+    if (char == ctrlKey('q')) {
+        try disableRawMode(&editorState.originalTermios);
+        _ = try stdout.write("\x1b[2J");
+        _ = try stdout.write("\x1b[H");
+        std.process.cleanExit();
+    }
+}
+
         }
     }
+fn editorRefreshScreen(editorState: *EditorState) !void {
+    _ = try stdout.write("\x1b[2J"); // Clear the entire screen
+    _ = try stdout.write("\x1b[H"); // Positoion cursor at row 1, col 1
 
-    try disableRawMode(originalTermios);
+    try editorDrawRows(editorState);
+
+    _ = try stdout.write("\x1b[H");
+}
+
+fn initEditor(editorState: *EditorState) !void {
+    try getWindowSize(&editorState.screenRows, &editorState.screenColumns);
+}
+
+pub fn main() !void {
+    // TODO: Handle error for invalid input
     var E: EditorState = .{
         .screenRows = 0,
         .screenColumns = 0,
         .originalTermios = undefined,
     };
+    try enableRawMode(&E.originalTermios);
+    try initEditor(&E);
+
+    while (true) {
+        try editorRefreshScreen(&E);
+        try editorProcessKeypress(&E);
+    }
     std.process.cleanExit();
 }
 
