@@ -58,6 +58,9 @@ fn enableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, raw);
 }
 
+fn editorReadKey() u8 {
+    return stdin.reader().readByte() catch 0;
+}
 
 
     while (true) {
@@ -84,6 +87,7 @@ fn editorProcessKeypress(editorState: *EditorState) !void {
 
         }
     }
+
 fn editorRefreshScreen(editorState: *EditorState) !void {
     _ = try stdout.write("\x1b[2J"); // Clear the entire screen
     _ = try stdout.write("\x1b[H"); // Positoion cursor at row 1, col 1
@@ -114,14 +118,9 @@ pub fn main() !void {
     std.process.cleanExit();
 }
 
-// TODO: Write more tests !
+// ~~~~~~~~~~~~~~TESTS~~~~~~~~~~~~~~ //
 
 test "expect ctrlKey to mask char into control key" {
     try std.testing.expect(ctrlKey('q') == 17);
 }
 
-// NOTE:
-// ~~~~~~
-//  - Because we have disable output processing, all newlines
-//    must be an explicit `\r\n`, just using `\n` will cause
-//    walking.
