@@ -136,8 +136,14 @@ fn editorProcessKeypress(editorState: *EditorState) !void {
     }
 }
 
+fn editorDrawRows(editorState: *EditorState) !void {
+    for (0..editorState.screenRows) |row| {
+        _ = try stdout.write("~");
+        if (row < editorState.screenRows - 1) {
+            _ = try stdout.write("\r\n");
         }
     }
+}
 
 fn editorRefreshScreen(editorState: *EditorState) !void {
     _ = try stdout.write("\x1b[2J"); // Clear the entire screen
@@ -159,6 +165,7 @@ pub fn main() !void {
         .screenColumns = 0,
         .originalTermios = undefined,
     };
+
     try enableRawMode(&E.originalTermios);
     try initEditor(&E);
 
@@ -175,3 +182,16 @@ test "expect ctrlKey to mask char into control key" {
     try std.testing.expect(ctrlKey('q') == 17);
 }
 
+test "charSliceToNumber works correctly with two digit number" {
+    const rows = [_]u8{ 53, 57 }; // {5, 9}
+    const expected = 59;
+    const actual = charSliceToNumber(rows[0..]);
+    try std.testing.expectEqual(expected, actual);
+}
+
+test "charSlicetoNumber works correctly with three digit number" {
+    const cols = [_]u8{ 50, 53, 54 }; // { 2, 5, 6 }
+    const expected = 256;
+    const actual = charSliceToNumber(cols[0..]);
+    try std.testing.expectEqual(expected, actual);
+}
