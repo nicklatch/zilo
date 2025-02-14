@@ -10,6 +10,13 @@ const TCSA = posix.TCSA;
 const VMIN = 6;
 const VTIME = 5;
 
+/// For containing state of the terminal and editor
+const EditorState = struct {
+    screenRows: usize,
+    screenColumns: usize,
+    originalTermios: posix.termios,
+};
+
 inline fn ctrlKey(key: u8) u8 {
     return key & 0x1f;
 }
@@ -76,6 +83,11 @@ pub fn main() !void {
     }
 
     try disableRawMode(originalTermios);
+    var E: EditorState = .{
+        .screenRows = 0,
+        .screenColumns = 0,
+        .originalTermios = undefined,
+    };
     std.process.cleanExit();
 }
 
