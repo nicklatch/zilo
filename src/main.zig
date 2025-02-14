@@ -3,6 +3,9 @@ const posix = std.posix;
 const TermiosSetError = std.posix.TermiosSetError;
 const TermiosGetError = std.posix.TermiosGetError;
 
+const stdout = std.io.getStdOut();
+const stdin = std.io.getStdIn();
+
 const TCSA = posix.TCSA;
 const VMIN = 6;
 const VTIME = 5;
