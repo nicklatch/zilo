@@ -10,25 +10,47 @@ const TCSA = posix.TCSA;
 const VMIN = 6;
 const VTIME = 5;
 
-/// For containing state of the terminal and editor
+const kiloVersion = "0.0.1";
+
+/// Contains state for the terminal and editor
 const EditorState = struct {
+    cursorX: usize,
+    cursorY: usize,
     screenRows: usize,
     screenColumns: usize,
     originalTermios: posix.termios,
 };
 
+/// Sets bits 5 and 6 to zero, masking the given key to a control sequence.
+///
+/// Arguments:
+///     `key`: The decimal value (`u8`) of an ansii character reprsenting a keypress
+/// Returns:
+///     A u8 representing the `key` masked to a control seqence (1..31, 127)
 inline fn ctrlKey(key: u8) u8 {
     return key & 0x1f;
 }
 
-/// Sets termios to the state passed in by `orginalTermios`.
+/// Sets termios to orginial state
+///
+/// Arguments:
+///     `termiosPtr`: A pointer to a `std.posix.termios` struct
+/// Returns:
+///     Either a `TermiosSetError` or nothing (`void`)
 fn disableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
     try posix.tcsetattr(posix.STDIN_FILENO, TCSA.FLUSH, termiosPtr.*);
 }
 
+const TermiosErr = TermiosGetError || TermiosSetError;
+
 /// Sets various flags in the Termios struct to
-/// switch from canonical mode to raw (cooked) mode.
-fn enableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
+/// switch from canonical (cooked) mode to raw mode.
+///
+/// Arguments:
+///     `termiosPtr`: A pointer to a `std.posix.termios` struct
+/// Returns:
+///     Either a `TermiosGetErr`, `TermiosSetErr`, or nothing (`void`)
+fn enableRawMode(termiosPtr: *posix.termios) TermiosErr!void {
     termiosPtr.* = try posix.tcgetattr(posix.STDIN_FILENO);
     var raw = termiosPtr.*;
 
@@ -59,7 +81,12 @@ fn enableRawMode(termiosPtr: *posix.termios) TermiosSetError!void {
 }
 
 fn editorReadKey() u8 {
-    return stdin.reader().readByte() catch 0;
+    var read = stdin.reader().readByte() catch 0;
+    if (read == 0) {
+        read = stdin.reader().readByte() catch 0;
+    }
+
+    return read;
 }
 
 /// Converts a `[]const u8` containing decimal representations of ascii chars
@@ -99,7 +126,6 @@ fn getCursorPosition(rows: *usize, cols: *usize) !void {
     var semiColonPos: usize = 0;
 
     _ = try stdout.write("\x1b[6n");
-
     while (i < @sizeOf(@TypeOf(buf)) - 1) {
         const input = stdin.reader().readByte() catch 0;
         buf[i] = input;
@@ -114,8 +140,6 @@ fn getCursorPosition(rows: *usize, cols: *usize) !void {
     const position: []u8 = buf[0..i];
     rows.* = charSliceToNumber(buf[2..semiColonPos]);
     cols.* = charSliceToNumber(buf[semiColonPos + 1 .. position.len - 1]);
-
-    try stdout.writer().print("\r\nrows: {any}\r\ncols: {any}\r\n", .{ rows, cols });
 
     _ = editorReadKey();
 }
@@ -132,26 +156,51 @@ fn editorProcessKeypress(editorState: *EditorState) !void {
         try disableRawMode(&editorState.originalTermios);
         _ = try stdout.write("\x1b[2J");
         _ = try stdout.write("\x1b[H");
-        std.process.cleanExit();
+        std.process.exit(0);
     }
 }
 
-fn editorDrawRows(editorState: *EditorState) !void {
+fn editorDrawRows(editorState: *EditorState, aBuf: *std.ArrayListAligned(u8, null)) !void {
     for (0..editorState.screenRows) |row| {
-        _ = try stdout.write("~");
+        if (row == editorState.screenRows / 3) {
+            var msgLen: usize = 16 + kiloVersion.len;
+            if (msgLen > editorState.screenColumns) msgLen = editorState.screenColumns;
+            var padding = (editorState.screenColumns - msgLen) / 2;
+
+            if (padding > 0) {
+                try aBuf.appendSlice("~");
+                padding -= 1;
+            }
+
+            while (padding > 0) : (padding -= 1) try aBuf.appendSlice(" ");
+            try aBuf.appendSlice("Kilo Editor -- v");
+            try aBuf.appendSlice(kiloVersion);
+        } else {
+            try aBuf.appendSlice("~");
+        }
+
+        try aBuf.appendSlice("\x1b[K");
         if (row < editorState.screenRows - 1) {
-            _ = try stdout.write("\r\n");
+            try aBuf.appendSlice("\r\n");
         }
     }
 }
 
-fn editorRefreshScreen(editorState: *EditorState) !void {
-    _ = try stdout.write("\x1b[2J"); // Clear the entire screen
-    _ = try stdout.write("\x1b[H"); // Positoion cursor at row 1, col 1
+fn editorRefreshScreen(editorState: *EditorState, allocator: std.mem.Allocator) !void {
+    var aBuf = std.ArrayList(u8).init(allocator);
 
-    try editorDrawRows(editorState);
+    try aBuf.appendSlice("\x1b[?25l");
+    try aBuf.appendSlice("\x1b[H"); // Positoion cursor at row 1, col 1
 
-    _ = try stdout.write("\x1b[H");
+    try editorDrawRows(editorState, &aBuf);
+
+    var printBuf: [32]u8 = undefined;
+    _ = try std.fmt.bufPrint(&printBuf, "\x1b[{d};{d}H", .{ editorState.cursorY + 1, editorState.cursorX + 1 });
+    try aBuf.appendSlice(&printBuf);
+    try aBuf.appendSlice("\x1b[?25h");
+
+    _ = try stdout.write(aBuf.items);
+    aBuf.clearAndFree();
 }
 
 fn initEditor(editorState: *EditorState) !void {
@@ -161,16 +210,21 @@ fn initEditor(editorState: *EditorState) !void {
 pub fn main() !void {
     // TODO: Handle error for invalid input
     var E: EditorState = .{
+        .cursorX = 0,
+        .cursorY = 0,
         .screenRows = 0,
         .screenColumns = 0,
         .originalTermios = undefined,
     };
 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
     try enableRawMode(&E.originalTermios);
     try initEditor(&E);
 
     while (true) {
-        try editorRefreshScreen(&E);
+        try editorRefreshScreen(&E, allocator);
         try editorProcessKeypress(&E);
     }
     std.process.cleanExit();
